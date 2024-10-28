@@ -2,6 +2,18 @@
 
 This repository contains code to reproduce experiments from *What Goes Into an LM Acceptability Judgment? Rethinking the Impact of Frequency and Length* (Tjuatja et al., 2024).
 
+## Setup
+Install the following major dependencies (versions listed are those used in this work):
+* accelerate (v0.33.0)
+* click (v8.1.7)
+* datasets (v2.18.0)
+* pandas (v2.1.4)
+* pytorch (v2.2.0)
+* scikit-learn (v1.4.2)
+* scipy (v1.13.1)
+* transformers (v4.42.3)
+* tqdm (v4.65.0)
+
 ## Calculating LM Log Probabilities
 This work uses materials from the Linguistic Inquiry data collected by [Sprouse et al. (2013)](https://www.jonsprouse.com/papers/Sprouse%20et%20al.%202013.pdf) (see `data/linguistic_inquiry_data.csv`). To calculate log probabilties to be used as input to linking functions (e.g. SLOR, MORCELA), from the `src/` directory run:
 ```
