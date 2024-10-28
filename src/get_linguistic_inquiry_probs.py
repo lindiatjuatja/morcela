@@ -121,16 +121,14 @@ def evaluate(
 
 
 @click.command()
-@click.option(
-    "--model_name",
+@click.argument(
+    "model_name",
     help="Model name",
     type=str,
-    required=True,
 )
 @click.option(
     "--save_dir",
     help="Directory to save results",
-    type=click.Path(exists=True),
     required=True,
 )
 @click.option(
@@ -140,15 +138,18 @@ def evaluate(
 )
 @click.option(
     "--distributed",
-    help="Whether to use distributed training",
+    help="Whether to use distributed inference",
     is_flag=True,
 )
 def main(
     model_name: str,
-    save_dir: str = "../results/",
+    save_dir: str = "../logprobs/",
     use_bos_token: bool = False,
     distributed: bool = False,
 ):
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
     assert model_name in MODELS.keys()
     tokenizer = AutoTokenizer.from_pretrained(MODELS[model_name])
     if distributed:

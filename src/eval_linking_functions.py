@@ -1,11 +1,8 @@
 """
-Calculates SLOR and generalized versions thereof.
+Calculates various linking functions using the Linguistic Inquiry data from Sprouse et. al (2017)
 
-Usage:
-python linguistic_inquiry_laws.py --model <model_name> --prefix <prefix> --unigram_n <unigram_n> --use_pile <use_pile> --result_file_name <result_file_name> --save_file <save_file>
-
-python linguistic_inquiry_laws.py --result_file_name per_token_probs.jsonl --save_file opt_n=100000.csv --unigram_n 100000 --model_family opt
-python linguistic_inquiry_laws.py --result_file_name per_token_probs_bos-False.jsonl --save_file pythia-pile.csv --use_pile True --model_family pythia
+Outputs a CSV file with the linking function results for the specified model family to <save_dir>/<save_filename>
+    as well as predictions per model in the <save_dir>/predictions directory
 """
 import click
 import json
@@ -22,13 +19,13 @@ from linking_functions import LinkingFunction
 
 def load_linguistic_inquiry_results(
         model_name: str,
-        results_dir: str,
+        logprobs_dir: str,
         result_file_name: str,
         unigram_n: int = 100000,
         use_pile: bool = False,
     ) -> pd.DataFrame:
     # Load LLM probability scores and lengths (in tokens)
-    with open(results_dir / result_file_name) as f:
+    with open(logprobs_dir / result_file_name) as f:
         lm_data = [json.loads(line) for line in f]
 
     good_token_p = [[math.log(p) for p in r["good_token_probs"]] for r in lm_data]
@@ -82,13 +79,12 @@ def load_linguistic_inquiry_results(
     help="Suite of models to evaluate",
     type=str,
     options=["opt", "pythia"],
-    required=True,
 )
 @click.option(
-    "--results_dir",
+    "--logprobs_dir",
     help="Directory where LM logprobs are stored",
     type=str,
-    default="../results/",
+    default="../logprobs/",
 )
 @click.option(
     "--unigram_n",
@@ -99,29 +95,37 @@ def load_linguistic_inquiry_results(
 @click.option(
     "--use_bos_token",
     help="For Pythia models, whether BOS token was used",
-    type=bool,
-    default=False,
+    is_flag=True,
 )
 @click.option(
     "--use_pile",
     help="Whether to use Pile unigram logprobs",
-    type=bool,
-    default=False,
+    is_flag=True,
 )
 @click.option(
-    "--save_file",
+    "--save_dir",
+    help="Directory to save predictions and linking function results to",
+    type=str,
+    required=True,
+)
+@click.option(
+    "--save_filename",
     help="Name of the file to save linking function results to",
     type=str,
     required=True,
 )
 def main(
-    model_family: str = None,
-    results_dir: str = "../results/",
+    model_family,
+    logprobs_dir: str = "../logprobs/",
     unigram_n: int = None,
     use_bos_token: bool = False,
     use_pile: bool = False,
-    save_file: str = None,
+    save_dir: str = "../results/",
+    save_filename: str = None,
 ):
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    
     if unigram_n is None and use_pile is False:
         unigram_n = 100000
     if model is not None:
@@ -144,22 +148,27 @@ def main(
                 result_file_name = f"{model}_bos-{use_bos_token}.jsonl"
         
         if unigram_n is None:
-            results_exist = os.path.exists(os.path.join(results_dir, result_file_name))
+            results_exist = os.path.exists(os.path.join(logprobs_dir, result_file_name))
         else:
             unigram_filename = f"{model}_n={unigram_n}.csv"
             results_exist = \
-                os.path.exists(os.path.join(results_dir, result_file_name)) & \
+                os.path.exists(os.path.join(logprobs_dir, result_file_name)) & \
                     os.path.exists(f"../unigram_logprobs/{unigram_filename}")
         if not results_exist:
             continue
         
-        sprouse_raw = load_linguistic_inquiry_results(model, results_dir, result_file_name)
+        sprouse_raw = load_linguistic_inquiry_results(model, logprobs_dir, result_file_name)
         function = LinkingFunction(sprouse_raw)
         function.add("Logprobs", None, 1, 0, 0, 0)
         function.add("SLOR", None, 1, -1, 0, 1)
         function.add("MORCELA, beta=1", None, 1, -1, None, 1)
         function.add("MORCELA, gamma=0", None, None, None, 0, 1)
         function.add("MORCELA", None, None, None, None, 1)
+        
+        # save predictions per model
+        if not os.path.exists(f"{save_dir}/predictions"):
+            os.makedirs(f"{save_dir}/predictions")
+        function.df.to_csv(f"{save_dir}/predictions/{model}.csv", index=False)
 
         result_df = function.results()
         result_df = result_df.round(3)
@@ -169,9 +178,7 @@ def main(
         model_results.append(result_df)
         
     result_df = pd.concat(model_results)
-    if not os.path.exists("../results"):
-        os.makedirs("../results")
-    result_df.to_csv(f"../results/{save_file}", index=True)
+    result_df.to_csv(f"{save_dir}/{save_filename}", index=True)
 
 
 if __name__ == "__main__":
