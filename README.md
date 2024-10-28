@@ -31,8 +31,8 @@ To calculate predictions and correlation of various linking functions (log proba
 python eval_linking_functions.py \
     <model_family ("opt" or "pythia")> \
     --logprobs_dir <directory where model log probs are saved> \
+    --unigram_file <filepath to unigram logprobs>
     --use_bos_token <set flag if using BOS token (for Pythia models)> \
-    --use_pile <set flag if using unigram frequencies from The Pile (for Pythia models)> \
     --save_dir <directory to save predictions and eval results> \
     --save_filename <filename for eval results>
 ```

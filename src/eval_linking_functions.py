@@ -18,11 +18,9 @@ from linking_functions import LinkingFunction
 
 
 def load_linguistic_inquiry_results(
-        model_name: str,
         logprobs_dir: str,
         result_file_name: str,
-        unigram_n: int = 100000,
-        use_pile: bool = False,
+        unigram_file: str,
     ) -> pd.DataFrame:
     # Load LLM probability scores and lengths (in tokens)
     with open(logprobs_dir / result_file_name) as f:
@@ -37,12 +35,11 @@ def load_linguistic_inquiry_results(
     bad_l = [len(r["bad_token_probs"]) for r in lm_data]
 
     # Load unigram distribution
-    if use_pile:
-        with open("../data/pile_unigram_logprobs.json") as f:
+    if unigram_file.split(".")[-1] == "json":
+        with open(unigram_file) as f:
             u_dist = json.load(f)
-    elif model_name in OPT_SUITE:
-        filename = f"unigram_dist_opt-30b_n={unigram_n}.csv"
-        u_dist = pd.read_csv(f"../unigram_logprobs/{filename}")
+    else:
+        u_dist = pd.read_csv(unigram_file)
         u_dist = dict(zip(u_dist["Token"], u_dist["Unigram Logprob"]))
 
     good_token_u = [[u_dist[w] for w in d["good_tokens"].split()] for d in lm_data]
@@ -87,19 +84,14 @@ def load_linguistic_inquiry_results(
     default="../logprobs/",
 )
 @click.option(
-    "--unigram_n",
-    help="Number of sentences sampled when estimating unigram logprobs",
-    type=int,
-    default=None,
+    "--unigram_file",
+    help="Filepath of unigram logprobs",
+    type=click.Path(exists=True),
+    required=True,
 )
 @click.option(
     "--use_bos_token",
     help="For Pythia models, whether BOS token was used",
-    is_flag=True,
-)
-@click.option(
-    "--use_pile",
-    help="Whether to use Pile unigram logprobs",
     is_flag=True,
 )
 @click.option(
@@ -117,29 +109,19 @@ def load_linguistic_inquiry_results(
 def main(
     model_family,
     logprobs_dir: str = "../logprobs/",
-    unigram_n: int = None,
+    unigram_file: str = None,
     use_bos_token: bool = False,
-    use_pile: bool = False,
     save_dir: str = "../results/",
     save_filename: str = None,
 ):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    
-    if unigram_n is None and use_pile is False:
-        unigram_n = 100000
-    if model is not None:
-        models = [model]
-    else:
-        if use_pile:
+        
+    if model_family == "pythia":
             models = PYTHIA_SUITE
-        else:
-            if model_family == "opt":
-                models = OPT_SUITE
-            elif model_family == "pythia":
-                models = PYTHIA_SUITE
-            else:
-                models = MODELS.keys()
+    else:
+        models = OPT_SUITE
+
     model_results = []
     for model in tqdm(models):
         result_file_name = f"{model}.jsonl"
@@ -147,17 +129,14 @@ def main(
             if not use_bos_token:
                 result_file_name = f"{model}_bos-{use_bos_token}.jsonl"
         
-        if unigram_n is None:
-            results_exist = os.path.exists(os.path.join(logprobs_dir, result_file_name))
-        else:
-            unigram_filename = f"{model}_n={unigram_n}.csv"
-            results_exist = \
-                os.path.exists(os.path.join(logprobs_dir, result_file_name)) & \
-                    os.path.exists(f"../unigram_logprobs/{unigram_filename}")
+        results_exist = \
+            os.path.exists(os.path.join(logprobs_dir, result_file_name)) & \
+                os.path.exists(unigram_file)
         if not results_exist:
             continue
         
-        sprouse_raw = load_linguistic_inquiry_results(model, logprobs_dir, result_file_name)
+        sprouse_raw = load_linguistic_inquiry_results(
+            logprobs_dir, result_file_name, unigram_file)
         function = LinkingFunction(sprouse_raw)
         function.add("Logprobs", None, 1, 0, 0, 0)
         function.add("SLOR", None, 1, -1, 0, 1)
