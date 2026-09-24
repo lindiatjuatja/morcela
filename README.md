@@ -2,6 +2,9 @@
 
 This repository contains code to reproduce experiments from *What Goes Into an LM Acceptability Judgment? Rethinking the Impact of Frequency and Length* (Tjuatja et al., 2024).
 
+## Note on reproducability
+Our experiments on Pythia 14M were done using the version trained on the deduplicated Pile, which is (as of Feb 27, 2026) hosted at [here](https://huggingface.co/EleutherAI/pythia-14m-deduped). The HF path to this model has been updated in `src/constants.py`.
+
 ## Setup
 Install the following major dependencies (versions listed are those used in this work):
 * accelerate (v0.33.0)
